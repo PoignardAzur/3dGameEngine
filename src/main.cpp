@@ -7,11 +7,16 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "AssetManager.hpp"
 #include "Primitives.hpp"
 #include "draw.hpp"
 
-int main(void)
+int main(int argc, char** argv)
 {
+  if (argc != 2) {
+    printf("Usage: %s <asset-path>", argv[0]);
+    return 1;
+  }
   try {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 
@@ -47,29 +52,15 @@ int main(void)
       glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION)
     );
 
-    const std::vector<float>& bufferData = {
-      0, 0, 0,
-      1, 0, 0,
-      0, 1, 0
-    };
-    BufferView* bufferView = createBufferView(bufferData);
-    Accessor accessor = {
-      bufferView,
-      0,
-      3,
-      Accessor::Type::Vec3,
-      Accessor::ComponentType::Float,
-      false
-    };
     MeshPrimitive::AttributeMap attributeMap = {
       { "POSITION", 0 }
     };
-    MeshPrimitive mesh = {
-      MeshPrimitive::Mode::Triangles,
-      { { "POSITION", &accessor } }
-    };
 
-    mesh.loadToGpu(attributeMap);
+    std::string assetPath = argv[1];
+    AssetManager assets;
+    int assetId = assets.loadAsset(assetPath);
+
+    assets.gpuLoadAll(attributeMap);
 
     auto shaderProgram = new ShaderProgram();
     shaderProgram->initFromFiles("dist/simple.vert", "dist/simple.frag");
@@ -81,7 +72,7 @@ int main(void)
       glEnable(GL_DEPTH_TEST);
 
       // DRAW
-      draw(*shaderProgram, mesh);
+      draw(*shaderProgram, assets.getMesh(assetId, 0)->primitives[0]);
 
       glfwSwapBuffers(window);
       glfwPollEvents();

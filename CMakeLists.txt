@@ -10,11 +10,13 @@ find_package(GLM REQUIRED)
 set(SRCS
   src/main.cpp
   src/Primitives.cpp
+  src/AssetManager.cpp
   src/draw.cpp
 )
 set(HDRS
   include/ShaderProgram.hpp
   src/Primitives.hpp
+  src/AssetManager.hpp
   src/draw.hpp
 )
 

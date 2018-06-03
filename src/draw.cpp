@@ -2,7 +2,7 @@
 #include <cassert>
 #include "draw.hpp"
 
-void draw(ShaderProgram& shaderProgram, MeshPrimitive& meshPrimitive) {
+void draw(ShaderProgram& shaderProgram, const MeshPrimitive& meshPrimitive) {
   assert(meshPrimitive.isLoaded());
   assert(meshPrimitive.attributes.count("POSITION") > 0);
 
@@ -10,11 +10,11 @@ void draw(ShaderProgram& shaderProgram, MeshPrimitive& meshPrimitive) {
   glBindVertexArray(meshPrimitive.vaoId);
 
   if (meshPrimitive.indices) {
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshPrimitive.indices->bufferView->vboId);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshPrimitive.indices->bufferView->vboId);
     glDrawElements(
       (GLenum)meshPrimitive.mode,
       meshPrimitive.indices->count,
-      (GLenum)meshPrimitive.indices->type,
+      (GLenum)meshPrimitive.indices->componentType,
       reinterpret_cast<GLvoid*>(meshPrimitive.indices->byteOffset)
     );
   }
@@ -22,7 +22,7 @@ void draw(ShaderProgram& shaderProgram, MeshPrimitive& meshPrimitive) {
     glDrawArrays(
       (GLenum)meshPrimitive.mode,
       0,
-      meshPrimitive.attributes["POSITION"]->count
+      meshPrimitive.attributes.at("POSITION")->count
     );
   }
 

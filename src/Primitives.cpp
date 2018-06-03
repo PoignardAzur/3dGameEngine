@@ -77,7 +77,6 @@ void MeshPrimitive::loadToGpu(const AttributeMap& attributeMap, bool reload) {
 
   if (this->indices) {
     this->indices->bufferView->loadToGpu(reload);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, this->indices->bufferView->vboId);
   }
 }
 
