@@ -4,3 +4,6 @@
 [submodule "include/fx-gltf"]
 	path = include/fx-gltf
 	url = https://github.com/jessey-git/fx-gltf
+[submodule "include/json"]
+	path = include/json
+	url = https://github.com/nlohmann/json

@@ -2,11 +2,13 @@
 #include <iostream>
 #include <cstdio>
 #include <chrono>
+#include <vector>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "../include/ShaderProgram.hpp"
+#include "Primitives.hpp"
+#include "draw.hpp"
 
 int main(void)
 {
@@ -45,6 +47,33 @@ int main(void)
       glGetString(GL_VERSION), glGetString(GL_SHADING_LANGUAGE_VERSION)
     );
 
+    const std::vector<float>& bufferData = {
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0
+    };
+    BufferView* bufferView = createBufferView(bufferData);
+    Accessor accessor = {
+      bufferView,
+      0,
+      3,
+      Accessor::Type::Vec3,
+      Accessor::ComponentType::Float,
+      false
+    };
+    MeshPrimitive::AttributeMap attributeMap = {
+      { "POSITION", 0 }
+    };
+    MeshPrimitive mesh = {
+      MeshPrimitive::Mode::Triangles,
+      { { "POSITION", &accessor } }
+    };
+
+    mesh.loadToGpu(attributeMap);
+
+    auto shaderProgram = new ShaderProgram();
+    shaderProgram->initFromFiles("dist/simple.vert", "dist/simple.frag");
+
     while (!glfwWindowShouldClose(window))
     {
       glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
@@ -52,7 +81,7 @@ int main(void)
       glEnable(GL_DEPTH_TEST);
 
       // DRAW
-      // ...
+      draw(*shaderProgram, mesh);
 
       glfwSwapBuffers(window);
       glfwPollEvents();

@@ -9,22 +9,32 @@ find_package(GLM REQUIRED)
 
 set(SRCS
   src/main.cpp
+  src/Primitives.cpp
+  src/draw.cpp
 )
 set(HDRS
   include/ShaderProgram.hpp
+  src/Primitives.hpp
+  src/draw.hpp
 )
 
 include_directories(
   ${GLEW_INCLUDE_DIRS}
   ${GLFW_INCLUDE_DIRS}
   ${GLM_INCLUDE_DIRS}
-  include,
+  include
   include/fx-gltf/include
+  include/json/include
 )
 link_libraries(
   ${GLEW_LIBRARIES}
   ${GLFW_LIBRARIES}
   ${GLM_LIBRARIES}
+)
+
+file(
+  COPY ./dist
+  DESTINATION ${CMAKE_BINARY_DIR}
 )
 add_executable(3dGameEngine ${SRCS} ${HDRS})
 
