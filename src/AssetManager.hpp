@@ -24,6 +24,8 @@ public:
   const Mesh* getMesh(const std::string& assetPath, size_t meshIndex) const;
   const Mesh* getMesh(size_t assetId, size_t meshIndex) const;
 
+  const fx::gltf::Document* getAsset(size_t assetId) const;
+
 private:
   void loadMesh(size_t assetId, size_t meshIndex);
 

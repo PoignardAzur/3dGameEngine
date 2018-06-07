@@ -103,3 +103,8 @@ const Mesh* AssetManager::getMesh(size_t assetId, size_t meshIndex) const {
     return &*it->second[meshIndex];
   }
 }
+
+const fx::gltf::Document* AssetManager::getAsset(size_t assetId) const {
+  auto it = m_assets.find(assetId);
+  return (it != m_assets.end()) ? &it->second : nullptr;
+}

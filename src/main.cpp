@@ -6,6 +6,7 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "AssetManager.hpp"
 #include "Primitives.hpp"
@@ -53,7 +54,8 @@ int main(int argc, char** argv)
     );
 
     MeshPrimitive::AttributeMap attributeMap = {
-      { "POSITION", 0 }
+      { "POSITION", 0 },
+      { "NORMAL", 1 }
     };
 
     std::string assetPath = argv[1];
@@ -63,7 +65,19 @@ int main(int argc, char** argv)
     assets.gpuLoadAll(attributeMap);
 
     auto shaderProgram = new ShaderProgram();
-    shaderProgram->initFromFiles("dist/simple.vert", "dist/simple.frag");
+    shaderProgram->initFromFiles("dist/phong.vert", "dist/phong.frag");
+    shaderProgram->addUniform("mvp");
+    shaderProgram->addUniform("modelView");
+    shaderProgram->addUniform("normalMatrix");
+    shaderProgram->addUniform("cc_lightPos");
+
+    glm::vec3 cameraPos = { 3, 3, 3 };
+
+    glm::mat4 model = glm::mat4(1);
+    glm::mat4 view = glm::lookAt(cameraPos, {0, 0, 0}, {0, 1, 0});
+    glm::mat4 projection = glm::perspective(
+      45.0f, 1.0f * width / height, 0.1f, 500.0f
+    );
 
     while (!glfwWindowShouldClose(window))
     {
@@ -72,7 +86,11 @@ int main(int argc, char** argv)
       glEnable(GL_DEPTH_TEST);
 
       // DRAW
-      draw(*shaderProgram, assets.getMesh(assetId, 0)->primitives[0]);
+      draw(
+        *shaderProgram,
+        assets, assetId,
+        model, view, projection
+      );
 
       glfwSwapBuffers(window);
       glfwPollEvents();
