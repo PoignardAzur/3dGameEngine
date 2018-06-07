@@ -80,58 +80,77 @@ void draw(
   shaderProgram.disable();
 }
 
-void _setSkeletonData(
-  std::vector<float>& bufferData, const glm::mat4& model,
-  const AssetManager& assets, size_t assetId,
-  uint32_t nodeIndex, uint32_t skinIndex
+static glm::mat4 _getNextModel(
+  const glm::mat4& model, const fx::gltf::Node& node
 ) {
-  const fx::gltf::Document& document = *assets.getAsset(assetId);
-  const fx::gltf::Node& node = document.nodes[nodeIndex];
-  const fx::gltf::Skin& skin = document.skins[skinIndex];
-
-  glm::mat4 nodeModel = (
+  return (
     model *
     glm::translate(glm::mat4(1), glm::make_vec3(node.translation.data())) *
     glm::mat4_cast(glm::make_quat(node.rotation.data())) *
     glm::scale(glm::mat4(1), glm::make_vec3(node.scale.data())) *
     glm::make_mat4(node.matrix.data())
   );
+}
 
-  for (size_t i = 0; i < skin.joints.size(); ++i) {
-    if (skin.joints[i] == nodeIndex) {
-      glm::vec4 matPos = model * glm::vec4(0, 0, 0, 1);
-      bufferData[i * 6 + 0] = matPos.x;
-      bufferData[i * 6 + 1] = matPos.y;
-      bufferData[i * 6 + 2] = matPos.z;
+void _setSkeletonData(
+  std::vector<glm::mat4>& skeletonData,
+  std::vector<float>* bufferData,
+  const glm::mat4& model,
+  const fx::gltf::Document& document,
+  const std::vector<uint32_t>& jointIndices,
+  uint32_t nodeIndex
+) {
+  glm::mat4 nodeModel = _getNextModel(model, document.nodes[nodeIndex]);
 
-      matPos = nodeModel * glm::vec4(0, 0, 0, 1);
-      bufferData[i * 6 + 3] = matPos.x;
-      bufferData[i * 6 + 4] = matPos.y;
-      bufferData[i * 6 + 5] = matPos.z;
+  for (size_t i = 0; i < jointIndices.size(); ++i) {
+    if (jointIndices[i] == nodeIndex) {
+      skeletonData[i] = nodeModel;
+      if (bufferData)
+      {
+        glm::vec4 matPos = model * glm::vec4(0, 0, 0, 1);
+        (*bufferData)[i * 6 + 0] = matPos.x;
+        (*bufferData)[i * 6 + 1] = matPos.y;
+        (*bufferData)[i * 6 + 2] = matPos.z;
 
+        matPos = nodeModel * glm::vec4(0, 0, 0, 1);
+        (*bufferData)[i * 6 + 3] = matPos.x;
+        (*bufferData)[i * 6 + 4] = matPos.y;
+        (*bufferData)[i * 6 + 5] = matPos.z;
+      }
       break;
     }
   }
 
   for (uint32_t childIndex: document.nodes[nodeIndex].children) {
     _setSkeletonData(
-      bufferData, nodeModel,
-      assets, assetId, childIndex, skinIndex
+      skeletonData,
+      bufferData,
+      nodeModel,
+      document,
+      jointIndices,
+      childIndex
     );
   }
 }
 
-std::vector<float> _getSkeleton(
-  const AssetManager& assets, size_t assetId,
-  uint32_t skinIndex
+std::vector<glm::mat4> _getSkeleton(
+  const fx::gltf::Document& document,
+  const std::vector<uint32_t>& jointIndices,
+  uint32_t skeletonNodeIndex,
+  std::vector<float>* bufferData
 ) {
-  const fx::gltf::Document& document = *assets.getAsset(assetId);
-  const fx::gltf::Skin& skin = document.skins[skinIndex];
-
-  std::vector<float> bufferData(3 * 2 * skin.joints.size(), 0);
-  _setSkeletonData(bufferData, glm::mat4(1), assets, assetId, skin.skeleton, skinIndex);
-
-  return bufferData;
+  std::vector<glm::mat4> skeletonData(jointIndices.size(), glm::mat4(1));
+  if (bufferData)
+    *bufferData = std::vector<float>(3 * 2 * jointIndices.size(), 0);
+  _setSkeletonData(
+    skeletonData,
+    bufferData,
+    glm::mat4(1),
+    document,
+    jointIndices,
+    skeletonNodeIndex
+  );
+  return skeletonData;
 }
 
 static void _drawNode(
@@ -142,28 +161,26 @@ static void _drawNode(
   const fx::gltf::Document& document = *assets.getAsset(assetId);
   const fx::gltf::Node& node = document.nodes[nodeIndex];
 
-  glm::mat4 nodeModel = (
-    model *
-    glm::translate(glm::mat4(1), glm::make_vec3(node.translation.data())) *
-    glm::mat4_cast(glm::make_quat(node.rotation.data())) *
-    glm::scale(glm::mat4(1), glm::make_vec3(node.scale.data())) *
-    glm::make_mat4(node.matrix.data())
-  );
+  glm::mat4 nodeModel = _getNextModel(model, node);
 
-  if (node.mesh != -1) {
+  if (false && node.mesh != -1) {
     _drawMesh(
       shaderProgram, *assets.getMesh(assetId, node.mesh),
       nodeModel, view, projection
     );
   }
 
-  if (node.skin != -1) {
-    std::vector<float> skeletonData = _getSkeleton(assets, assetId, node.skin);
-    BufferView* skeleton = createBufferView(skeletonData);
+  if (true && node.skin != -1) {
+    const fx::gltf::Skin& skin = document.skins[node.skin];
+
+    std::vector<float> bufferData;
+    _getSkeleton(document, skin.joints, skin.skeleton, &bufferData);
+    BufferView* skeleton = createBufferView(bufferData);
+
     Accessor accessor = {
       skeleton,
       0,
-      skeletonData.size() / 3,
+      bufferData.size() / 3,
       Accessor::Type::Vec3,
       Accessor::ComponentType::Float,
     };
