@@ -10,7 +10,7 @@
 
 void draw(
   ShaderProgram& shaderProgram,
-  const MeshPrimitive& mesh,
+  const MeshPrimitive& meshPrimitive, const Material& material,
   const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
 );
 

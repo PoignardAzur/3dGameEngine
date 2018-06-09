@@ -1,6 +1,16 @@
+#include <cassert>
+#include <glm/gtc/type_ptr.hpp>
+#include <stb/stb_image.h>
+
 #include "AssetManager.hpp"
 
-AssetManager::AssetManager() {}
+AssetManager::AssetManager() {
+  m_defaultColorTexture = {
+    std::vector<uint8_t>(4, 255),
+    1, 1,
+    fx::gltf::Sampler {}
+  };
+}
 
 AssetManager::~AssetManager() {
   // TODO - unload
@@ -8,11 +18,13 @@ AssetManager::~AssetManager() {
 
 size_t AssetManager::loadAsset(const std::string& path, bool loadAll, bool reload) {
   m_assetPaths[path] = m_nextAssetId;
-  m_assets[m_nextAssetId] = fx::gltf::LoadFromText(path);
+  m_assets[m_nextAssetId] = fx::gltf::LoadFromBinary(path);
 
   const fx::gltf::Document& document = m_assets[m_nextAssetId];
 
   m_meshes[m_nextAssetId].resize(document.meshes.size());
+  m_materials[m_nextAssetId].resize(document.materials.size());
+  m_textures[m_nextAssetId].resize(document.textures.size());
   m_accessors[m_nextAssetId].resize(document.accessors.size());
   m_bufferViews[m_nextAssetId].resize(document.bufferViews.size());
   m_buffers[m_nextAssetId].resize(document.buffers.size());
@@ -70,17 +82,74 @@ size_t AssetManager::loadAsset(const std::string& path, bool loadAll, bool reloa
     }
   }
 
+  auto& textures = m_textures[m_nextAssetId];
+  for (size_t i = 0; i < document.textures.size(); ++i) {
+    const fx::gltf::Texture& textureObj = document.textures[i];
+    const fx::gltf::Image& imageData = document.images[textureObj.source];
+
+    std::vector<uint8_t> textureData;
+    int x, y;
+    if (imageData.uri != "") {
+      uint8_t* rawData = stbi_load(imageData.uri.c_str(), &x, &y, nullptr, 4);
+      assert(rawData);
+      // TODO - if (!rawData)
+      textureData = std::vector<uint8_t>(rawData, rawData + x * y * 4);
+      stbi_image_free(rawData);
+    }
+    else {
+      const BufferView& bufferedImage = *bufferViews[imageData.bufferView];
+
+      assert(bufferedImage.byteStride == 0);
+      uint8_t* rawData = stbi_load_from_memory(
+        bufferedImage.buffer->data.data() + bufferedImage.byteOffset,
+        bufferedImage.byteLength,
+        &x, &y, nullptr, 4
+      );
+      assert(rawData);
+      // TODO - if (!rawData)
+      textureData = std::vector<uint8_t>(rawData, rawData + x * y * 4);
+      stbi_image_free(rawData);
+    }
+
+    int32_t samplerId = textureObj.sampler;
+
+    textures[i] = TextureData {
+      std::move(textureData), x, y,
+      samplerId != (int32_t)(-1)
+        ? document.samplers[samplerId]
+        : fx::gltf::Sampler {}
+    };
+  }
+
+  auto& materials = m_materials[m_nextAssetId];
+  for (size_t i = 0; i < document.materials.size(); ++i) {
+    const fx::gltf::Material& materialData = document.materials[i];
+
+    int32_t textureId = materialData.pbrMetallicRoughness.baseColorTexture.index;
+
+    materials[i] = Material {
+      glm::make_vec4(materialData.pbrMetallicRoughness.baseColorFactor.data()),
+      textureId != -1 ? &*textures[textureId] : &m_defaultColorTexture
+    };
+  }
+
   return m_nextAssetId++;
 }
 
 void AssetManager::gpuLoadAll(const MeshPrimitive::AttributeMap& attributeMap) {
-  for (auto& pair: m_meshes) {
-    auto& meshes = pair.second;
-    for (auto& optMesh: meshes) {
+  for (auto& meshesIt: m_meshes) {
+    for (auto& optMesh: meshesIt.second) {
       if (optMesh) {
         for (MeshPrimitive& primitive: optMesh->primitives) {
           primitive.loadToGpu(attributeMap);
         }
+      }
+    }
+  }
+  for (auto& materialsIt: m_materials) {
+    for (auto& optMaterial: materialsIt.second) {
+      if (optMaterial) {
+        optMaterial->loadToGpu();
       }
     }
   }
@@ -101,6 +170,26 @@ const Mesh* AssetManager::getMesh(size_t assetId, size_t meshIndex) const {
   }
   else {
     return &*it->second[meshIndex];
+  }
+}
+
+const Material* AssetManager::getMaterial(const std::string& assetPath, size_t materialIndex) const {
+  auto it = m_assetPaths.find(assetPath);
+  return (it != m_assetPaths.end())
+    ? getMaterial(it->second, materialIndex)
+    : nullptr;
+}
+
+const Material* AssetManager::getMaterial(size_t assetId, size_t materialIndex) const {
+  auto it = m_materials.find(assetId);
+  if (it == m_materials.end()) {
+    return nullptr;
+  }
+  if (!it->second[materialIndex]) {
+    return nullptr;
+  }
+  else {
+    return &*it->second[materialIndex];
   }
 }
 

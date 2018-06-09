@@ -81,6 +81,69 @@ void MeshPrimitive::loadToGpu(const AttributeMap& attributeMap, bool reload) {
 }
 
 
+bool Material::isLoaded() const {
+  TextureData* textures[]  = {
+    this->baseColorTexture
+  };
+  for (TextureData* texture: textures) {
+    if (!texture->isLoaded()) {
+      return false;
+    }
+  }
+  return true;
+}
+
+void Material::loadToGpu(bool reload) {
+  TextureData* textures[]  = {
+    this->baseColorTexture
+  };
+  for (TextureData* texture: textures) {
+    texture->loadToGpu(reload);
+  }
+}
+
+
+bool TextureData::isLoaded() const {
+  return (this->texId != 0);
+}
+
+void TextureData::loadToGpu(bool reload) {
+  if (this->isLoaded()) {
+    if (reload) {
+      glDeleteTextures(1, &this->texId);
+      this->texId = 0;
+    }
+    else {
+      return;
+    }
+  }
+
+  glActiveTexture(GL_TEXTURE0);
+  glGenTextures(1, &this->texId);
+  glBindTexture(GL_TEXTURE_2D, this->texId);
+
+  if (this->sampler.magFilter != fx::gltf::Sampler::MagFilter::None) {
+    glTexParameteri(
+      GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLint)this->sampler.magFilter
+    );
+  }
+  if (this->sampler.minFilter != fx::gltf::Sampler::MinFilter::None) {
+    glTexParameteri(
+      GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (GLint)this->sampler.minFilter
+    );
+  }
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, (GLint)this->sampler.wrapS);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, (GLint)this->sampler.wrapT);
+
+  glTexImage2D(
+    GL_TEXTURE_2D, 0, GL_RGBA, this->width, this->height,
+    0,
+    GL_RGBA, GL_UNSIGNED_BYTE, this->data.data()
+  );
+  glGenerateMipmap(GL_TEXTURE_2D);
+}
+
+
 bool BufferView::isLoaded() const {
   return (this->vboId != 0);
 }

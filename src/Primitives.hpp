@@ -4,11 +4,14 @@
 
 #include <GL/glew.h>
 #include <fx/gltf.h>
+#include <glm/vec4.hpp>
 
 #include <vector>
 
 struct Mesh;
 struct MeshPrimitive;
+struct Material;
+struct TextureData;
 struct Accessor;
 struct BufferView;
 struct BufferData;
@@ -35,8 +38,26 @@ struct MeshPrimitive {
   void loadToGpu(const AttributeMap& attributeMap, bool reload = false);
 };
 
-// struct Material {};
-// struct TextureData {};
+struct Material {
+  glm::vec4 baseColorFactor = glm::vec4(0.5);
+  TextureData* baseColorTexture = nullptr;
+
+  bool isLoaded() const;
+  void loadToGpu(bool reload = false);
+};
+
+struct TextureData {
+  std::vector<uint8_t> data = {};
+  int width = 0;
+  int height = 0;
+
+  fx::gltf::Sampler sampler;
+
+  GLuint texId = 0;
+
+  bool isLoaded() const;
+  void loadToGpu(bool reload = false);
+};
 
 struct Accessor {
   using Type = fx::gltf::Accessor::Type;

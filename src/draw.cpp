@@ -7,12 +7,13 @@
 
 #include "draw.hpp"
 
-static void _drawMesh(
+static void _drawMeshPrimitive(
   ShaderProgram& shaderProgram,
-  const MeshPrimitive& meshPrimitive,
+  const MeshPrimitive& meshPrimitive, const Material& material,
   const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
 ) {
   assert(meshPrimitive.isLoaded());
+  assert(material.isLoaded());
   assert(meshPrimitive.attributes.count("POSITION") > 0);
 
   glBindVertexArray(meshPrimitive.vaoId);
@@ -40,6 +41,15 @@ static void _drawMesh(
     glm::value_ptr(view * gc_lightPos)
   );
 
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, material.baseColorTexture->texId);
+  glUniform1i(shaderProgram.uniform("textureId"), 0);
+
+  glUniform4fv(
+    shaderProgram.uniform("c_materialColor"), 1,
+    glm::value_ptr(material.baseColorFactor)
+  );
+
   if (meshPrimitive.indices) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshPrimitive.indices->bufferView->vboId);
     glDrawElements(
@@ -60,24 +70,42 @@ static void _drawMesh(
   glBindVertexArray(0);
 }
 
-static void _drawMesh(
-  ShaderProgram& shaderProgram,
-  const Mesh& mesh,
-  const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
-) {
-  for (const MeshPrimitive& meshPrimitive: mesh.primitives) {
-    _drawMesh(shaderProgram, meshPrimitive, model, view, projection);
-  }
-}
-
 void draw(
   ShaderProgram& shaderProgram,
-  const MeshPrimitive& meshPrimitive,
+  const MeshPrimitive& meshPrimitive, const Material& material,
   const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
 ) {
   shaderProgram.use();
-  _drawMesh(shaderProgram, meshPrimitive, model, view, projection);
+  _drawMeshPrimitive(
+    shaderProgram,
+    meshPrimitive, material,
+    model, view, projection
+  );
   shaderProgram.disable();
+}
+
+static void _drawMesh(
+  ShaderProgram& shaderProgram,
+  const AssetManager& assets, size_t assetId, uint32_t meshIndex,
+  const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
+) {
+  const fx::gltf::Document& document = *assets.getAsset(assetId);
+  const auto& mesh = *assets.getMesh(assetId, meshIndex);
+  const auto& meshObj = document.meshes[meshIndex];
+
+  for (size_t i = 0; i < mesh.primitives.size(); ++i) {
+    const MeshPrimitive& meshPrimitive = mesh.primitives[i];
+    auto materialIndex = meshObj.primitives[i].material;
+    auto material = materialIndex != -1
+      ? *assets.getMaterial(assetId, materialIndex)
+      : Material {};
+
+    _drawMeshPrimitive(
+      shaderProgram,
+      meshPrimitive, material,
+      model, view, projection
+    );
+  }
 }
 
 static glm::mat4 _getNextModel(
@@ -163,14 +191,15 @@ static void _drawNode(
 
   glm::mat4 nodeModel = _getNextModel(model, node);
 
-  if (false && node.mesh != -1) {
+  if (true && node.mesh != -1) {
     _drawMesh(
-      shaderProgram, *assets.getMesh(assetId, node.mesh),
+      shaderProgram,
+      assets, assetId, node.mesh,
       nodeModel, view, projection
     );
   }
 
-  if (true && node.skin != -1) {
+  if (false && node.skin != -1) {
     const fx::gltf::Skin& skin = document.skins[node.skin];
 
     std::vector<float> bufferData;
@@ -192,8 +221,9 @@ static void _drawNode(
       { { "POSITION", 0 } }
     );
 
-    _drawMesh(
-      shaderProgram, skeletonMesh,
+    _drawMeshPrimitive(
+      shaderProgram,
+      skeletonMesh, Material { glm::vec4(1) },
       nodeModel, view, projection
     );
 
@@ -202,7 +232,8 @@ static void _drawNode(
 
   for (uint32_t childIndex: document.nodes[nodeIndex].children) {
     _drawNode(
-      shaderProgram, assets, assetId, childIndex,
+      shaderProgram,
+      assets, assetId, childIndex,
       nodeModel, view, projection
     );
   }
@@ -218,7 +249,11 @@ void draw(
   const fx::gltf::Document& document = *assets.getAsset(assetId);
 
   for (uint32_t rootNode: document.scenes[0].nodes) {
-    _drawNode(shaderProgram, assets, assetId, rootNode, model, view, projection);
+    _drawNode(
+      shaderProgram,
+      assets, assetId, rootNode,
+      model, view, projection
+    );
   }
 
   shaderProgram.disable();

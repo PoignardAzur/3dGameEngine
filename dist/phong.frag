@@ -6,8 +6,12 @@
 uniform mat4 modelView;
 uniform vec4 cc_lightPos;
 
+uniform vec4 c_materialColor;
+uniform sampler2D textureId;
+
 in vec3 cc_pos;
 in vec3 cc_normal;
+in vec2 tc_texture;
 
 out vec4 c_fragColor;
 
@@ -20,5 +24,10 @@ void main()
 
   float diffuseIntensity = max(dot(cc_lightdir, cc_normal), 0);
 
-  c_fragColor = vec4(vec3(diffuseIntensity), 1);
+  vec4 c_textureColor = texture(textureId, tc_texture);
+  c_fragColor = (
+    vec4(vec3(diffuseIntensity), 1)
+    * c_materialColor
+    * c_textureColor
+  );
 }

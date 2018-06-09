@@ -8,6 +8,10 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_FAILURE_USERMSG
+#include <stb/stb_image.h>
+
 #include "AssetManager.hpp"
 #include "Primitives.hpp"
 #include "draw.hpp"
@@ -19,7 +23,7 @@ int main(int argc, char** argv)
     return 1;
   }
   try {
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    // unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 
     if (!glfwInit()) {
       throw std::runtime_error("Error initializing glfw");
@@ -45,6 +49,13 @@ int main(int argc, char** argv)
       throw std::runtime_error("Error initializing glew");
     }
 
+    /*
+    glfwSetWindowSizeCallback(window, window_size_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    glfwSetKeyCallback(window, key_callback);
+    */
+
     // enable vsync
     glfwSwapInterval(1);
 
@@ -55,7 +66,8 @@ int main(int argc, char** argv)
 
     MeshPrimitive::AttributeMap attributeMap = {
       { "POSITION", 0 },
-      { "NORMAL", 1 }
+      { "NORMAL", 1 },
+      { "TEXCOORD_0", 2 }
     };
 
     std::string assetPath = argv[1];
@@ -70,6 +82,8 @@ int main(int argc, char** argv)
     shaderProgram->addUniform("modelView");
     shaderProgram->addUniform("normalMatrix");
     shaderProgram->addUniform("cc_lightPos");
+    shaderProgram->addUniform("c_materialColor");
+    shaderProgram->addUniform("textureId");
 
     glm::vec3 cameraPos = { 3, 3, 3 };
 
@@ -94,7 +108,7 @@ int main(int argc, char** argv)
 
       glfwSwapBuffers(window);
       glfwPollEvents();
-      //glfwWaitEvents();
+      // glfwWaitEvents();
     }
 
     glfwDestroyWindow(window);
