@@ -3,10 +3,10 @@
 #include "Primitives.hpp"
 
 // TODO - Integrate to gltf lib
-static int _getComponentCount(Accessor::Type accessorType) {
+static inline uint32_t _getComponentCount(Accessor::Type accessorType) {
   switch (accessorType) {
     case Accessor::Type::None: {
-      assert(false);
+      break;
     }
     case Accessor::Type::Scalar:
     case Accessor::Type::Vec2:
@@ -19,6 +19,33 @@ static int _getComponentCount(Accessor::Type accessorType) {
     case Accessor::Type::Mat4: {
       int count = (int)accessorType - (int)Accessor::Type::Mat2 + 2;
       return count * count;
+    }
+  }
+  assert(false);
+}
+
+static inline uint32_t _getComponentSize(Accessor::ComponentType componentType) {
+  switch (componentType) {
+    case Accessor::ComponentType::None: {
+      break;
+    }
+    case Accessor::ComponentType::Byte: {
+      return 1;
+    }
+    case Accessor::ComponentType::UnsignedByte: {
+      return 1;
+    }
+    case Accessor::ComponentType::Short: {
+      return 2;
+    }
+    case Accessor::ComponentType::UnsignedShort: {
+      return 2;
+    }
+    case Accessor::ComponentType::UnsignedInt: {
+      return 4;
+    }
+    case Accessor::ComponentType::Float: {
+      return 4;
     }
   }
   assert(false);
@@ -143,6 +170,56 @@ void TextureData::loadToGpu(bool reload) {
     GL_RGBA, GL_UNSIGNED_BYTE, this->data.data()
   );
   glGenerateMipmap(GL_TEXTURE_2D);
+}
+
+
+inline uint32_t Accessor::getStride() const {
+  uint32_t stride = this->bufferView->byteStride;
+  return stride != 0
+    ? stride
+    : _getComponentCount(this->type) * _getComponentSize(this->componentType)
+  ;
+}
+
+float Accessor::getComponent(uint32_t element, uint32_t component) const {
+  assert(component < _getComponentCount(this->type));
+
+  const void* compData = (
+    this->bufferView->buffer->data.data()
+    + this->byteOffset + this->bufferView->byteOffset
+    + element * this->getStride()
+    + component * _getComponentSize(this->componentType)
+  );
+
+  switch (this->componentType) {
+    case Accessor::ComponentType::None: {
+      break;
+    }
+    case ComponentType::Byte: {
+      float f = *(int8_t*)compData;
+      return this->normalized ? std::max(f / 127.0, -1.0) : f;
+    }
+    case ComponentType::UnsignedByte: {
+      float f = *(uint8_t*)compData;
+      return this->normalized ? f / 255.0 : f;
+    }
+    case ComponentType::Short: {
+      float f = *(int16_t*)compData;
+      return this->normalized ? std::max(f / 32767.0, -1.0) : f;
+    }
+    case ComponentType::UnsignedShort: {
+      float f = *(uint16_t*)compData;
+      return this->normalized ? f / 65535.0 : f;
+    }
+    case ComponentType::UnsignedInt: {
+      float f = *(uint16_t*)compData;
+      return this->normalized ? f / 4294967295.0 : f;
+    }
+    case ComponentType::Float: {
+      return *(float*)compData;
+    }
+  }
+  assert(false);
 }
 
 

@@ -29,6 +29,9 @@ public:
   const Material* getMaterial(const std::string& assetPath, size_t materialIndex) const;
   const Material* getMaterial(size_t assetId, size_t materialIndex) const;
 
+  const Accessor* getAccessor(const std::string& assetPath, size_t accessorIndex) const;
+  const Accessor* getAccessor(size_t assetId, size_t accessorIndex) const;
+
   const fx::gltf::Document* getAsset(size_t assetId) const;
 
 private:

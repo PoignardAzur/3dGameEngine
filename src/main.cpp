@@ -89,17 +89,22 @@ int main(int argc, char** argv)
       45.0f, 1.0f * width / height, 0.1f, 500.0f
     );
 
+    auto startTime = std::chrono::steady_clock::now();
+
     while (!glfwWindowShouldClose(window))
     {
       glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glEnable(GL_DEPTH_TEST);
 
+      auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime);
+
       // DRAW
       draw(
         *shaderProgram,
         assets, assetId,
-        model, view, projection
+        model, view, projection,
+        elapsedTime.count() / 1000.f
       );
 
       glfwSwapBuffers(window);

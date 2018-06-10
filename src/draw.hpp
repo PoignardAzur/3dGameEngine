@@ -17,7 +17,8 @@ void draw(
 void draw(
   ShaderProgram& shaderProgram,
   const AssetManager& assets, size_t assetId,
-  const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
+  const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection,
+  float elapsedTime
 );
 
 #endif // !DRAW_H

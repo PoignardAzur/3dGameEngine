@@ -7,6 +7,7 @@
 #include <glm/vec4.hpp>
 
 #include <vector>
+#include <array>
 
 struct Mesh;
 struct MeshPrimitive;
@@ -77,6 +78,9 @@ struct Accessor {
   bool normalized = false;
 
   // Sparse sparse{};
+
+  uint32_t getStride() const;
+  float getComponent(uint32_t element, uint32_t component = 0) const;
 
   std::vector<float> max = {};
   std::vector<float> min = {};

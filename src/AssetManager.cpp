@@ -23,7 +23,11 @@ AssetManager::~AssetManager() {
 
 size_t AssetManager::loadAsset(const std::string& path, bool loadAll, bool reload) {
   m_assetPaths[path] = m_nextAssetId;
-  m_assets[m_nextAssetId] = fx::gltf::LoadFromBinary(path);
+  if (path.find(".gltf") == path.size() - 5) {
+    m_assets[m_nextAssetId] = fx::gltf::LoadFromText(path);
+  } else {
+    m_assets[m_nextAssetId] = fx::gltf::LoadFromBinary(path);
+  }
 
   const fx::gltf::Document& document = m_assets[m_nextAssetId];
 
@@ -197,6 +201,30 @@ const Material* AssetManager::getMaterial(size_t assetId, size_t materialIndex) 
   }
   else {
     return &*it->second[materialIndex];
+  }
+}
+
+const Accessor* AssetManager::getAccessor(
+  const std::string& assetPath, size_t accessorIndex
+) const {
+  auto it = m_assetPaths.find(assetPath);
+  return (it != m_assetPaths.end())
+    ? getAccessor(it->second, accessorIndex)
+    : nullptr;
+}
+
+const Accessor* AssetManager::getAccessor(
+  size_t assetId, size_t accessorIndex
+) const {
+  auto it = m_accessors.find(assetId);
+  if (it == m_accessors.end()) {
+    return nullptr;
+  }
+  if (!it->second[accessorIndex]) {
+    return nullptr;
+  }
+  else {
+    return &*it->second[accessorIndex];
   }
 }
 

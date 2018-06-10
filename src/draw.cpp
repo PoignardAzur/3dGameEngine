@@ -124,15 +124,82 @@ static glm::mat4 _getNextModel(
   );
 }
 
+static std::vector<fx::gltf::Node> _getAnimatedNodes(
+  const AssetManager& assets, size_t assetId,
+  uint32_t animIndex,
+  float animTime
+) {
+  const fx::gltf::Document& document = *assets.getAsset(assetId);
+  const fx::gltf::Animation& anim = document.animations[animIndex];
+
+  std::vector<fx::gltf::Node> newNodes = document.nodes;
+
+  for (const auto& channel: anim.channels) {
+    fx::gltf::Node& node = newNodes[channel.target.node];
+    const auto& sampler = anim.samplers[channel.sampler];
+
+    const Accessor& times = *assets.getAccessor(assetId, sampler.input);
+    const Accessor& values = *assets.getAccessor(assetId, sampler.output);
+
+    assert(times.count == values.count);
+    assert(times.type == Accessor::Type::Scalar);
+    assert(times.componentType == Accessor::ComponentType::Float);
+
+    if (times.count == 0)
+      continue;
+
+    // Keyframes
+    uint32_t prevKf;
+    uint32_t nextKf = 0;
+    while (nextKf < times.count && times.getComponent(nextKf) < animTime) {
+      nextKf++;
+    }
+    prevKf = std::max<uint32_t>(1, nextKf) - 1;
+    nextKf = std::min<uint32_t>(nextKf, times.count - 1);
+
+    float prevTime = times.getComponent(prevKf);
+    float nextTime = times.getComponent(nextKf);
+    float transition = (nextKf != prevKf) ?
+      (animTime - prevTime) / (nextTime - prevTime)
+      : 0;
+
+    if (channel.target.path == "translation") {
+      for (size_t i = 0; i < 3; ++i) {
+        node.translation[i] = (
+          values.getComponent(prevTime, i) * (1 - transition)
+          + values.getComponent(nextTime, i) * transition
+        );
+      }
+    }
+    else if (channel.target.path == "rotation") {
+      for (size_t i = 0; i < 4; ++i) {
+        node.rotation[i] = (
+          values.getComponent(prevTime, i) * (1 - transition)
+          + values.getComponent(nextTime, i) * transition
+        );
+      }
+    }
+    else if (channel.target.path == "scale") {
+      for (size_t i = 0; i < 3; ++i) {
+        node.scale[i] = (
+          values.getComponent(prevTime, i) * (1 - transition)
+          + values.getComponent(nextTime, i) * transition
+        );
+      }
+    }
+  }
+  return std::move(newNodes);
+}
+
 void _setSkeletonData(
   std::vector<glm::mat4>& skeletonData,
   std::vector<float>* bufferData,
   const glm::mat4& model,
-  const fx::gltf::Document& document,
+  const std::vector<fx::gltf::Node>& nodes,
   const std::vector<uint32_t>& jointIndices,
   uint32_t nodeIndex
 ) {
-  glm::mat4 nodeModel = _getNextModel(model, document.nodes[nodeIndex]);
+  glm::mat4 nodeModel = _getNextModel(model, nodes[nodeIndex]);
 
   for (size_t i = 0; i < jointIndices.size(); ++i) {
     if (jointIndices[i] == nodeIndex) {
@@ -153,12 +220,12 @@ void _setSkeletonData(
     }
   }
 
-  for (uint32_t childIndex: document.nodes[nodeIndex].children) {
+  for (uint32_t childIndex: nodes[nodeIndex].children) {
     _setSkeletonData(
       skeletonData,
       bufferData,
       nodeModel,
-      document,
+      nodes,
       jointIndices,
       childIndex
     );
@@ -166,7 +233,7 @@ void _setSkeletonData(
 }
 
 std::vector<glm::mat4> _getSkeleton(
-  const fx::gltf::Document& document,
+  const std::vector<fx::gltf::Node>& nodes,
   const std::vector<uint32_t>& jointIndices,
   uint32_t skeletonNodeIndex,
   std::vector<float>* bufferData
@@ -178,7 +245,7 @@ std::vector<glm::mat4> _getSkeleton(
     skeletonData,
     bufferData,
     glm::mat4(1),
-    document,
+    nodes,
     jointIndices,
     skeletonNodeIndex
   );
@@ -187,11 +254,12 @@ std::vector<glm::mat4> _getSkeleton(
 
 static void _drawNode(
   ShaderProgram& shaderProgram,
-  const AssetManager& assets, size_t assetId, uint32_t nodeIndex,
+  const AssetManager& assets, size_t assetId,
+  const std::vector<fx::gltf::Node>& nodes, uint32_t nodeIndex,
   const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
 ) {
   const fx::gltf::Document& document = *assets.getAsset(assetId);
-  const fx::gltf::Node& node = document.nodes[nodeIndex];
+  const fx::gltf::Node& node = nodes[nodeIndex];
 
   glm::mat4 nodeModel = _getNextModel(model, node);
 
@@ -207,7 +275,7 @@ static void _drawNode(
     const fx::gltf::Skin& skin = document.skins[node.skin];
 
     std::vector<float> bufferData;
-    _getSkeleton(document, skin.joints, skin.skeleton, &bufferData);
+    _getSkeleton(nodes, skin.joints, skin.skeleton, &bufferData);
     BufferView* skeleton = createBufferView(bufferData);
 
     Accessor accessor = {
@@ -224,20 +292,38 @@ static void _drawNode(
     skeletonMesh.loadToGpu(
       { { "POSITION", 0 } }
     );
+    // FIXME
+    TextureData defaultColorTexture = {
+      std::vector<uint8_t>(4, 255),
+      1, 1,
+      fx::gltf::Sampler {}
+    };
+    TextureData defaultNormalMap = {
+      { 0, 0, 255, 255 },
+      1, 1,
+      fx::gltf::Sampler {}
+    };
+    Material mat {
+      glm::vec4(1),
+      &defaultColorTexture,
+      &defaultNormalMap
+    };
+    mat.loadToGpu();
 
     _drawMeshPrimitive(
       shaderProgram,
-      skeletonMesh, Material { glm::vec4(1) },
+      skeletonMesh, mat,
       nodeModel, view, projection
     );
 
     glDeleteBuffers(1, &skeleton->vboId);
   }
 
-  for (uint32_t childIndex: document.nodes[nodeIndex].children) {
+  for (uint32_t childIndex: nodes[nodeIndex].children) {
     _drawNode(
       shaderProgram,
-      assets, assetId, childIndex,
+      assets, assetId,
+      nodes, childIndex,
       nodeModel, view, projection
     );
   }
@@ -246,16 +332,21 @@ static void _drawNode(
 void draw(
   ShaderProgram& shaderProgram,
   const AssetManager& assets, size_t assetId,
-  const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
+  const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection,
+  float elapsedTime
 ) {
   shaderProgram.use();
 
   const fx::gltf::Document& document = *assets.getAsset(assetId);
+  std::vector<fx::gltf::Node> nodes = document.animations.size() > 0
+    ? _getAnimatedNodes(assets, assetId, 0, elapsedTime)
+    : document.nodes;
 
   for (uint32_t rootNode: document.scenes[0].nodes) {
     _drawNode(
       shaderProgram,
-      assets, assetId, rootNode,
+      assets, assetId,
+      nodes, rootNode,
       model, view, projection
     );
   }
