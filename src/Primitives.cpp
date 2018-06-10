@@ -83,7 +83,8 @@ void MeshPrimitive::loadToGpu(const AttributeMap& attributeMap, bool reload) {
 
 bool Material::isLoaded() const {
   TextureData* textures[]  = {
-    this->baseColorTexture
+    this->baseColorTexture,
+    this->normalMap
   };
   for (TextureData* texture: textures) {
     if (!texture->isLoaded()) {
@@ -95,7 +96,8 @@ bool Material::isLoaded() const {
 
 void Material::loadToGpu(bool reload) {
   TextureData* textures[]  = {
-    this->baseColorTexture
+    this->baseColorTexture,
+    this->normalMap
   };
   for (TextureData* texture: textures) {
     texture->loadToGpu(reload);

@@ -9,6 +9,7 @@ find_package(GLM REQUIRED)
 
 set(SRCS
   src/main.cpp
+  src/libs.cpp
   src/Primitives.cpp
   src/AssetManager.cpp
   src/draw.cpp

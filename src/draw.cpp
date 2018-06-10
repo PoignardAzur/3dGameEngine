@@ -36,14 +36,18 @@ static void _drawMeshPrimitive(
 
   glm::vec4 gc_lightPos(1, 2, 3, 1);
 
-  glUniform4fv(
+  glUniform3fv(
     shaderProgram.uniform("cc_lightPos"), 1,
-    glm::value_ptr(view * gc_lightPos)
+    glm::value_ptr(glm::vec3(view * gc_lightPos))
   );
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, material.baseColorTexture->texId);
   glUniform1i(shaderProgram.uniform("textureId"), 0);
+
+  glActiveTexture(GL_TEXTURE1);
+  glBindTexture(GL_TEXTURE_2D, material.normalMap->texId);
+  glUniform1i(shaderProgram.uniform("normalMapId"), 1);
 
   glUniform4fv(
     shaderProgram.uniform("c_materialColor"), 1,

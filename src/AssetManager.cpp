@@ -10,6 +10,11 @@ AssetManager::AssetManager() {
     1, 1,
     fx::gltf::Sampler {}
   };
+  m_defaultNormalMap = {
+    { 0, 0, 255, 255 },
+    1, 1,
+    fx::gltf::Sampler {}
+  };
 }
 
 AssetManager::~AssetManager() {
@@ -126,10 +131,12 @@ size_t AssetManager::loadAsset(const std::string& path, bool loadAll, bool reloa
     const fx::gltf::Material& materialData = document.materials[i];
 
     int32_t textureId = materialData.pbrMetallicRoughness.baseColorTexture.index;
+    int32_t normalMapId = materialData.normalTexture.index;
 
     materials[i] = Material {
       glm::make_vec4(materialData.pbrMetallicRoughness.baseColorFactor.data()),
-      textureId != -1 ? &*textures[textureId] : &m_defaultColorTexture
+      textureId != -1 ? &*textures[textureId] : &m_defaultColorTexture,
+      normalMapId != -1 ? &*textures[normalMapId] : &m_defaultNormalMap
     };
   }
 

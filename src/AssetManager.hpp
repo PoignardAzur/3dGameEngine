@@ -47,6 +47,7 @@ private:
   std::unordered_map<size_t, std::vector<std::optional<BufferData>>> m_buffers;
 
   TextureData m_defaultColorTexture;
+  TextureData m_defaultNormalMap;
 };
 
 #endif // !ASSET_MANAGER_H

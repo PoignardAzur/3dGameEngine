@@ -8,10 +8,6 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_FAILURE_USERMSG
-#include <stb/stb_image.h>
-
 #include "AssetManager.hpp"
 #include "Primitives.hpp"
 #include "draw.hpp"
