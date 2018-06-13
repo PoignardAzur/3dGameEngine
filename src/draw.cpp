@@ -117,12 +117,29 @@ static void _drawMesh(
   const auto& mesh = *assets.getMesh(assetId, meshIndex);
   const auto& meshObj = document.meshes[meshIndex];
 
+  TextureData defaultColorTexture = {
+    std::vector<uint8_t>(4, 255),
+    1, 1,
+    fx::gltf::Sampler {}
+  };
+  TextureData defaultNormalMap = {
+    { 0, 0, 255, 255 },
+    1, 1,
+    fx::gltf::Sampler {}
+  };
+  Material defaultMaterial {
+    glm::vec4(1),
+    &defaultColorTexture,
+    &defaultNormalMap
+  };
+  defaultMaterial.loadToGpu();
+
   for (size_t i = 0; i < mesh.primitives.size(); ++i) {
     const MeshPrimitive& meshPrimitive = mesh.primitives[i];
     auto materialIndex = meshObj.primitives[i].material;
     auto material = materialIndex != -1
       ? *assets.getMaterial(assetId, materialIndex)
-      : Material {};
+      : defaultMaterial;
 
     _drawMeshPrimitive(
       shaderProgram,
