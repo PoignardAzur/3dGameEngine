@@ -63,7 +63,9 @@ int main(int argc, char** argv)
     MeshPrimitive::AttributeMap attributeMap = {
       { "POSITION", 0 },
       { "NORMAL", 1 },
-      { "TEXCOORD_0", 2 }
+      { "TEXCOORD_0", 2 },
+      { "JOINTS_0", 3 },
+      { "WEIGHTS_0", 4 }
     };
 
     std::string assetPath = argv[1];
@@ -80,6 +82,10 @@ int main(int argc, char** argv)
     shaderProgram->addUniform("cc_lightPos");
     shaderProgram->addUniform("c_materialColor");
     shaderProgram->addUniform("textureId");
+
+    for (size_t i = 0; i < 16; ++i) {
+      shaderProgram->addUniform("oc_jointMatrices[" + std::to_string(i) + "]");
+    }
 
     glm::vec3 cameraPos = { 3, 3, 3 };
 

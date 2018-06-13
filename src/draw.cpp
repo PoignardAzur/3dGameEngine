@@ -10,6 +10,7 @@
 static void _drawMeshPrimitive(
   ShaderProgram& shaderProgram,
   const MeshPrimitive& meshPrimitive, const Material& material,
+  const std::vector<glm::mat4>* joints,
   const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
 ) {
   assert(meshPrimitive.isLoaded());
@@ -33,6 +34,23 @@ static void _drawMeshPrimitive(
     1, GL_FALSE,
     glm::value_ptr(glm::mat3(glm::transpose(glm::inverse(view * model))))
   );
+
+  for (size_t i = 0; i < 16; ++i) {
+    if (joints && i < joints->size()) {
+      glUniformMatrix4fv(
+        shaderProgram.uniform("oc_jointMatrices[" + std::to_string(i) + "]"),
+        1, GL_FALSE,
+        glm::value_ptr((*joints)[i])
+      );
+    }
+    else {
+      glUniformMatrix4fv(
+        shaderProgram.uniform("oc_jointMatrices[" + std::to_string(i) + "]"),
+        1, GL_FALSE,
+        glm::value_ptr(glm::mat4(1))
+      );
+    }
+  }
 
   glm::vec4 gc_lightPos(1, 2, 3, 1);
 
@@ -83,6 +101,7 @@ void draw(
   _drawMeshPrimitive(
     shaderProgram,
     meshPrimitive, material,
+    nullptr,
     model, view, projection
   );
   shaderProgram.disable();
@@ -91,6 +110,7 @@ void draw(
 static void _drawMesh(
   ShaderProgram& shaderProgram,
   const AssetManager& assets, size_t assetId, uint32_t meshIndex,
+  const std::vector<glm::mat4>* joints,
   const glm::mat4& model, const glm::mat4& view, const glm::mat4& projection
 ) {
   const fx::gltf::Document& document = *assets.getAsset(assetId);
@@ -107,6 +127,7 @@ static void _drawMesh(
     _drawMeshPrimitive(
       shaderProgram,
       meshPrimitive, material,
+      joints,
       model, view, projection
     );
   }
@@ -260,63 +281,87 @@ static void _drawNode(
 ) {
   const fx::gltf::Document& document = *assets.getAsset(assetId);
   const fx::gltf::Node& node = nodes[nodeIndex];
+  bool DRAW_SKELETON = false;
 
   glm::mat4 nodeModel = _getNextModel(model, node);
 
-  if (true && node.mesh != -1) {
-    _drawMesh(
-      shaderProgram,
-      assets, assetId, node.mesh,
-      nodeModel, view, projection
-    );
-  }
+  if (node.mesh != -1) {
+    std::vector<glm::mat4> joints;
+    std::vector<glm::mat4>* jointsPtr = nullptr;
 
-  if (false && node.skin != -1) {
-    const fx::gltf::Skin& skin = document.skins[node.skin];
+    if (node.skin != -1) {
+      const fx::gltf::Skin& skin = document.skins[node.skin];
 
-    std::vector<float> bufferData;
-    _getSkeleton(nodes, skin.joints, skin.skeleton, &bufferData);
-    BufferView* skeleton = createBufferView(bufferData);
+      std::vector<float> bufferData;
+      joints = _getSkeleton(nodes, skin.joints, skin.skeleton, &bufferData);
+      jointsPtr = &joints;
+      BufferView* skeleton = createBufferView(bufferData);
 
-    Accessor accessor = {
-      skeleton,
-      0,
-      bufferData.size() / 3,
-      Accessor::Type::Vec3,
-      Accessor::ComponentType::Float,
-    };
-    MeshPrimitive skeletonMesh = {
-      MeshPrimitive::Mode::Lines,
-      { { "POSITION", &accessor } }
-    };
-    skeletonMesh.loadToGpu(
-      { { "POSITION", 0 } }
-    );
-    // FIXME
-    TextureData defaultColorTexture = {
-      std::vector<uint8_t>(4, 255),
-      1, 1,
-      fx::gltf::Sampler {}
-    };
-    TextureData defaultNormalMap = {
-      { 0, 0, 255, 255 },
-      1, 1,
-      fx::gltf::Sampler {}
-    };
-    Material mat {
-      glm::vec4(1),
-      &defaultColorTexture,
-      &defaultNormalMap
-    };
-    mat.loadToGpu();
+      const Accessor& inverseBindMatrices = *assets.getAccessor(
+        assetId, skin.inverseBindMatrices
+      );
 
-    _drawMeshPrimitive(
-      shaderProgram,
-      skeletonMesh, mat,
-      nodeModel, view, projection
-    );
+      assert(joints.size() == inverseBindMatrices.count);
+      for (size_t i = 0; i < joints.size(); ++i) {
+        std::array<float, 16> inverseBindMatrixData;
+        for (size_t j = 0; j < 16; ++j) {
+          inverseBindMatrixData[j] = inverseBindMatrices.getComponent(i, j);
+        }
+        joints[i] = joints[i] * glm::make_mat4(inverseBindMatrixData.data());
+      }
 
-    glDeleteBuffers(1, &skeleton->vboId);
+      if (DRAW_SKELETON) {
+        Accessor accessor = {
+          skeleton,
+          0,
+          bufferData.size() / 3,
+          Accessor::Type::Vec3,
+          Accessor::ComponentType::Float,
+        };
+        MeshPrimitive skeletonMesh = {
+          MeshPrimitive::Mode::Lines,
+          { { "POSITION", &accessor } }
+        };
+        skeletonMesh.loadToGpu(
+          { { "POSITION", 0 } }
+        );
+        // FIXME
+        TextureData defaultColorTexture = {
+          std::vector<uint8_t>(4, 255),
+          1, 1,
+          fx::gltf::Sampler {}
+        };
+        TextureData defaultNormalMap = {
+          { 0, 0, 255, 255 },
+          1, 1,
+          fx::gltf::Sampler {}
+        };
+        Material mat {
+          glm::vec4(1),
+          &defaultColorTexture,
+          &defaultNormalMap
+        };
+        mat.loadToGpu();
+
+        _drawMeshPrimitive(
+          shaderProgram,
+          skeletonMesh, mat,
+          nullptr,
+          nodeModel, view, projection
+        );
+
+        glDeleteBuffers(1, &skeleton->vboId);
+      }
+    }
+
+    if (!DRAW_SKELETON) {
+      _drawMesh(
+        shaderProgram,
+        assets, assetId, node.mesh,
+        jointsPtr,
+        nodeModel, view, projection
+      );
+    }
   }
 
   for (uint32_t childIndex: nodes[nodeIndex].children) {
